@@ -1,0 +1,9 @@
+base_url: https://kidb.adb.org/api/v4/sdmx
+agency_id: ADB
+end_year: 2025
+
+tags:
+  - economics
+  - environment
+  - development
+  - socioeconomics

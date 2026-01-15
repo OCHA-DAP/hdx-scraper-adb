@@ -1,0 +1,12 @@
+license_id: cc-by
+methodology: |
+  [FAQ](https://kidb.adb.org/faq)
+caveats: |
+  [Terms of use](https://kidb.adb.org/terms)
+dataset_source: Asian Development Bank
+package_creator: HDX Data Systems Team
+private: False
+maintainer: b682f6f7-cd7e-4bd4-8aa7-f74138dc6313
+owner_org: c64c8840-933b-4378-91a4-d5063da28879
+data_update_frequency: 365
+notes: TBD
