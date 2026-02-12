@@ -386,13 +386,16 @@ class Pipeline:
                     continue
 
                 for ind_chunk in self.chunks(indicators, chunk_size):
-                    payload = self.get_sdmx_data_for_country_dataflow(
-                        dataflow_id=dataflow_id,
-                        indicator_chunk=ind_chunk,
-                        country_code=economy_code,
-                    )
-
-                    if payload is None:
+                    try:
+                        payload = self.get_sdmx_data_for_country_dataflow(
+                            dataflow_id=dataflow_id,
+                            indicator_chunk=ind_chunk,
+                            country_code=economy_code,
+                        )
+                    except DownloadError as e:
+                        logger.warning(
+                            f"Skipping {dataflow_id} for {economy_code}: {str(e)}"
+                        )
                         continue
 
                     rows = self.flatten_sdmx_json(
