@@ -32,22 +32,17 @@ def configuration(config_dir):
         project_config_yaml=join(config_dir, "project_configuration.yaml"),
     )
     # Change locations below to match those needed in tests
-    Locations.set_validlocations(
-        [
-            {"name": "afg", "title": "Afghanistan"},
-            {"name": "sdn", "title": "Sudan"},
-            {"name": "world", "title": "World"},
-        ]
-    )
+    Locations.set_validlocations([{"name": "afg", "title": "Afghanistan"}])
     Country.countriesdata(False)
     Vocabulary._approved_vocabulary = {
         "tags": [
             {"name": tag}
             # Change tags below to match those needed in tests
             for tag in (
-                "hxl",
-                "humanitarian needs overview - hno",
-                "people in need - pin",
+                "economics",
+                "environment",
+                "development",
+                "socioeconomics",
             )
         ],
         "id": "b891512e-9516-4bf5-962a-7a289772a2a1",

@@ -2,6 +2,7 @@
 """Adb scraper"""
 
 import logging
+import time
 from typing import Any
 
 import requests
@@ -65,7 +66,20 @@ class Pipeline:
             logger.warning(f"Skipping indicators for {dataflow_id} due to error: {e}")
             return []
 
-        return [r["code"] for r in indicators if "code" in r]
+        codes = [r["code"] for r in indicators if "code" in r]
+
+        # Filter out problematic indicators (IT_NET_BBND, IT_NET_BBND_P2)
+        filtered_codes = []
+        for code in codes:
+            if dataflow_id in ["TC", "TC_COM"] and code in [
+                "IT_NET_BBND",
+                "IT_NET_BBND_P2",
+            ]:
+                continue
+
+            filtered_codes.append(code)
+
+        return filtered_codes
 
     def chunks(self, lst: list, n: int):
         """Split list into chunks"""
@@ -154,7 +168,7 @@ class Pipeline:
             dataflow_name=dataflow_name,
         )
 
-    def _get_dataset_and_structure(self, payload: dict) -> tuple[dict, dict]:
+    def _get_dataset_and_structure(self, payload: dict) -> tuple:
         """Get dataset and structure from sdmx payload"""
         data = payload.get("data") or {}
         datasets = data.get("datasets") or [None]
@@ -181,12 +195,12 @@ class Pipeline:
             if time_values[i]
         }
 
-    def _get_series_dimensions(self, struct: dict) -> list[dict]:
+    def _get_series_dimensions(self, struct: dict) -> list:
         """Get series dimensions from structure"""
         dimensions = struct.get("dimensions") or {}
         return dimensions.get("series") or []
 
-    def _get_observation_attributes(self, struct: dict) -> list[dict]:
+    def _get_observation_attributes(self, struct: dict) -> list:
         """Get observation attribute definitions from structure"""
         attributes = struct.get("attributes") or {}
         return attributes.get("observation") or []
@@ -195,7 +209,7 @@ class Pipeline:
         self,
         series_key: str,
         keypos: int,
-        series_dims: list[dict],
+        series_dims: list,
     ) -> dict:
         """
         Get decoded dimension value for series key at a given position
@@ -297,7 +311,13 @@ class Pipeline:
 
         return rows
 
-    def get_indicators_per_country(self, chunk_size: int = 15):
+    def get_indicators_per_country(
+        self,
+        countries: list | None = None,
+        dataflows: list | None = None,
+        chunk_size: int = 15,
+        max_countries: int | None = None,
+    ):
         """
         Iterate through all countries and dataflows (excluding SDG),
         fetching indicators in chunks to avoid API limits. For each country,
@@ -305,7 +325,12 @@ class Pipeline:
         flattened data.
 
         Args:
+            countries: list of country dicts with 'id' and 'name' keys
+                       If None, fetches all countries from API
+            dataflows: list of dataflow dicts with 'id' and 'name' keys
+                       If None, fetches all non-SDG dataflows from API
             chunk_size: number of indicators to request per API call, default is 15
+            max_countries: maximum number of countries to process, or None for all
 
         Yields:
             dict: one dictionary per country with keys:
@@ -320,10 +345,18 @@ class Pipeline:
             - Empty dataflows are skipped
             - Failed API requests return None and are skipped
         """
-        countries = self.get_countries()
-        dataflows = [
-            df for df in self.get_dataflows() if not df.get("id", "").startswith("SDG")
-        ]
+        if countries is None:
+            countries = self.get_countries()
+
+        if max_countries is not None:
+            countries = countries[:max_countries]
+
+        if dataflows is None:
+            dataflows = [
+                df
+                for df in self.get_dataflows()
+                if not df.get("id", "").startswith("SDG")
+            ]
 
         # Build indicators map once
         indicators_by_dataflow = {}
@@ -333,19 +366,26 @@ class Pipeline:
             if indicators:
                 indicators_by_dataflow[dataflow_id] = indicators
 
-        for country in countries[:1]:
+        total_countries = len(countries)
+        for i, country in enumerate(countries):
             economy_code = country["id"]
             economy_name = country["name"]
+            country_start = time.time()
+
+            logger.info(
+                f"Processing country {i + 1}/{total_countries}: "
+                f"{economy_name} ({economy_code})"
+            )
 
             all_rows = []
-            for dataflow in dataflows[:1]:
+            for dataflow in dataflows:
                 dataflow_id = dataflow["id"]
 
                 indicators = indicators_by_dataflow.get(dataflow_id, [])
                 if not indicators:
                     continue
 
-                for ind_chunk in list(self.chunks(indicators, chunk_size)):
+                for ind_chunk in self.chunks(indicators, chunk_size):
                     payload = self.get_sdmx_data_for_country_dataflow(
                         dataflow_id=dataflow_id,
                         indicator_chunk=ind_chunk,
@@ -360,6 +400,12 @@ class Pipeline:
                         dataflow_name=dataflow["name"],
                     )
                     all_rows.extend(rows)
+
+            elapsed = time.time() - country_start
+            logger.info(
+                f"Finished {economy_name} ({economy_code}) in "
+                f"{elapsed:.1f}s: {len(all_rows)} rows"
+            )
 
             yield {
                 "economy_code": economy_code,

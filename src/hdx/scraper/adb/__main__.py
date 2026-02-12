@@ -59,7 +59,7 @@ def main(
             )
             pipeline = Pipeline(configuration, retriever, tempdir)
 
-            for output in pipeline.get_indicators_per_country(chunk_size=15):
+            for output in pipeline.get_indicators_per_country(max_countries=5):
                 dataset = pipeline.generate_dataset(
                     economy_code=output["economy_code"],
                     rows=output["data"],
@@ -71,8 +71,8 @@ def main(
                             join("config", "hdx_dataset_static.yaml"), main
                         )
                     )
-                    dataset["notes"] = (
-                        f"Key Indicators for {economy_name} presents the latest data on economic, financial, social, and environmental development issues in the country."
+                    dataset["notes"] = dataset["notes"].replace(
+                        "(country)", economy_name
                     )
                     dataset.create_in_hdx(
                         remove_additional_resources=True,
@@ -86,7 +86,7 @@ def main(
 if __name__ == "__main__":
     facade(
         main,
-        hdx_site="stage",
+        hdx_site="demo",
         user_agent_config_yaml=join(expanduser("~"), ".useragents.yaml"),
         user_agent_lookup=_LOOKUP,
         project_config_yaml=script_dir_plus_file(
