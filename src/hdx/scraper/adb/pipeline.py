@@ -311,6 +311,20 @@ class Pipeline:
 
         return rows
 
+    # Top-level dataflows whose indicators are supersets of their children.
+    # Querying only these avoids redundant API calls to child dataflows
+    # (e.g. EO contains all indicators from EO_NA, EO_NA_CONST, etc.).
+    TOP_LEVEL_DATAFLOWS = {
+        "EGELC",
+        "ENV",
+        "EO",
+        "GG",
+        "GLB",
+        "MFP",
+        "PPL",
+        "TC",
+    }
+
     def get_indicators_per_country(
         self,
         countries: list | None = None,
@@ -328,7 +342,7 @@ class Pipeline:
             countries: list of country dicts with 'id' and 'name' keys
                        If None, fetches all countries from API
             dataflows: list of dataflow dicts with 'id' and 'name' keys
-                       If None, fetches all non-SDG dataflows from API
+                       If None, fetches all non-SDG top-level dataflows from API
             chunk_size: number of indicators to request per API call, default is 15
             max_countries: maximum number of countries to process, or None for all
 
@@ -342,6 +356,7 @@ class Pipeline:
 
         Note:
             - SDG dataflows are excluded from the query
+            - Child dataflows are skipped (parents contain all their indicators)
             - Empty dataflows are skipped
             - Failed API requests return None and are skipped
         """
@@ -355,7 +370,7 @@ class Pipeline:
             dataflows = [
                 df
                 for df in self.get_dataflows()
-                if not df.get("id", "").startswith("SDG")
+                if df.get("id", "") in self.TOP_LEVEL_DATAFLOWS
             ]
 
         # Build indicators map once
