@@ -32,7 +32,9 @@ class TestPipeline:
 
                 output = next(
                     pipeline.get_indicators_per_country(
-                        countries=test_countries, dataflows=test_dataflows
+                        countries=test_countries,
+                        dataflows=test_dataflows,
+                        chunk_size=15,
                     )
                 )
 
@@ -43,8 +45,11 @@ class TestPipeline:
                 assert "dataflow" in row
                 assert "indicator" in row
                 assert "year" in row
+                assert "start_date" in row
+                assert "end_date" in row
                 assert "value" in row
                 assert "unit_of_measure" in row
+                assert "source" in row
 
                 dataset = pipeline.generate_dataset(
                     economy_code=output["economy_code"],
@@ -59,15 +64,14 @@ class TestPipeline:
                 assert dataset == {
                     "caveats": "[Terms of use](https://kidb.adb.org/terms)\n",
                     "data_update_frequency": 365,
-                    "dataset_date": "[2024-01-01T00:00:00 TO 2025-12-31T23:59:59]",
-                    "dataset_source": "Asian Development Bank",
+                    "dataset_date": "[2024-01-01T00:00:00 TO 2024-12-31T23:59:59]",
+                    "dataset_source": "National and international agencies via ADB Key Indicators Database",
                     "groups": [{"name": "afg"}],
                     "license_id": "cc-by",
                     "maintainer": "b682f6f7-cd7e-4bd4-8aa7-f74138dc6313",
                     "methodology": "[FAQ](https://kidb.adb.org/faq)\n",
-                    "name": "afghanistan-key-indicators",
-                    "notes": "Key Indicators for Afghanistan presents the latest data on economic, "
-                    "financial, social, and environmental development issues in the country.",
+                    "name": "afg-key-indicators",
+                    "notes": "This dataset contains key indicators for Afghanistan compiled from the ADB Key Indicators Database (KIDB).",
                     "owner_org": "c64c8840-933b-4378-91a4-d5063da28879",
                     "package_creator": "HDX Data Systems Team",
                     "private": False,
@@ -96,7 +100,8 @@ class TestPipeline:
                 resources = dataset.get_resources()
                 assert len(resources) == 1
                 assert resources[0] == {
-                    "name": "afg-key-indicators.csv",
-                    "description": "Key indicators for Afghanistan",
+                    "name": "afg_adb_key_indicators.csv",
+                    "description": "Key indicators for Afghanistan compiled from the ADB Key "
+                    "Indicators Database (KIDB) for 2024.",
                     "format": "csv",
                 }

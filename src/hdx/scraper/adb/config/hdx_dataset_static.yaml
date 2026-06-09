@@ -3,10 +3,10 @@ methodology: |
   [FAQ](https://kidb.adb.org/faq)
 caveats: |
   [Terms of use](https://kidb.adb.org/terms)
-dataset_source: Asian Development Bank
+dataset_source: National and international agencies via ADB Key Indicators Database
 package_creator: HDX Data Systems Team
 private: False
 maintainer: b682f6f7-cd7e-4bd4-8aa7-f74138dc6313
 owner_org: c64c8840-933b-4378-91a4-d5063da28879
 data_update_frequency: 365
-notes: Key Indicators for (country) presents the latest data on economic, financial, social, and environmental development issues in the country.
+notes: "This dataset contains key indicators for (country) compiled from the ADB Key Indicators Database (KIDB)."

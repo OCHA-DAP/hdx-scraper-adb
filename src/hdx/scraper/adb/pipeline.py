@@ -1,6 +1,7 @@
 #!/usr/bin/python
 """Adb scraper"""
 
+import datetime
 import logging
 import time
 from typing import Any
@@ -10,8 +11,8 @@ from hdx.api.configuration import Configuration
 from hdx.data.dataset import Dataset
 from hdx.location.country import Country
 from hdx.utilities.base_downloader import DownloadError
+from hdx.utilities.dateparse import parse_date_range
 from hdx.utilities.retriever import Retrieve
-from slugify import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class Pipeline:
         self._configuration = configuration
         self._retriever = retriever
         self._tempdir = tempdir
+        self._latest_year = None
 
     def get_countries(self) -> list:
         """Get list of countries (economies) with country code and name"""
@@ -33,8 +35,8 @@ class Pipeline:
         countries = []
         for code in economy_codelist["codes"]:
             id = code["id"]
-            name = Country.get_country_name_from_iso3(id)
-            if name:
+            name = code["name"]
+            if name and Country.get_country_name_from_iso3(id):
                 countries.append({"id": id, "name": name})
         return sorted(countries, key=lambda c: c["name"])
 
@@ -53,17 +55,34 @@ class Pipeline:
             )
         return dataflows
 
+    def get_latest_year(self) -> int:
+        """Probe the API to discover the latest year with published data"""
+        current_year = datetime.date.today().year
+        base_url = self._configuration["base_url"]
+        agency_id = self._configuration.get("agency_id", "ADB")
+        url = (
+            f"{base_url}/data/{agency_id},PPL/A.LP_PE_NUM_MOP.AFG"
+            f"?format=sdmx-json&startPeriod={current_year - 3}&endPeriod={current_year}"
+        )
+        payload = self._retriever.download_json(url, "adb-latest-year-probe.json")
+        structures = (payload.get("data") or {}).get("structures") or [{}]
+        obs_dims = (structures[0] or {}).get("dimensions", {}).get("observation") or []
+        time_values = (obs_dims[0] if obs_dims else {}).get("values") or []
+        years = [int(v["value"]) for v in time_values if v and v.get("value")]
+        if not years:
+            raise ValueError(
+                "Could not determine latest available year from ADB API probe"
+            )
+        return max(years)
+
     def get_indicators_by_dataflow(self, dataflow_id: str) -> list:
         """Get list of indicator codes for a specific dataflow"""
         indicators_url = f"https://kidb.adb.org/api/dataflow/indicators/{dataflow_id}"
 
         try:
             indicators = self._retriever.download_json(indicators_url)
-        except DownloadError as e:
-            logger.warning(f"Skipping indicators for {dataflow_id}: {e}")
-            return []
         except Exception as e:
-            logger.warning(f"Skipping indicators for {dataflow_id} due to error: {e}")
+            logger.warning(f"Skipping indicators for {dataflow_id}: {e}")
             return []
 
         codes = [r["code"] for r in indicators if "code" in r]
@@ -103,12 +122,10 @@ class Pipeline:
         """
         base_url = self._configuration["base_url"]
         agency_id = self._configuration.get("agency_id", "ADB")
-        end_year = self._configuration.get("end_year", 2025)
-        start_year = end_year - 1
 
         indicators_part = "+".join(indicator_chunk)
         key = f"A.{indicators_part}.{country_code}"
-        url = f"{base_url}/data/{agency_id},{dataflow_id}/{key}?format=sdmx-json&startPeriod={start_year}&endPeriod={end_year}"
+        url = f"{base_url}/data/{agency_id},{dataflow_id}/{key}?format=sdmx-json&startPeriod={self._latest_year}"
 
         # Create unique filename from indicator code and length of chunk
         first_ind = indicator_chunk[0].lower()
@@ -282,6 +299,12 @@ class Pipeline:
 
                 value = observation_data[0]
                 year = time_lookup.get(time_index)
+                if year:
+                    date_start, date_end = parse_date_range(year)
+                    start_date = date_start.strftime("%Y-%m-%d")
+                    end_date = date_end.strftime("%Y-%m-%d")
+                else:
+                    start_date = end_date = None
 
                 # Decode observation attributes
                 attrs = {}
@@ -304,8 +327,11 @@ class Pipeline:
                         "dataflow": dataflow_name,
                         "indicator": indicator.get("name"),
                         "year": year,
+                        "start_date": start_date,
+                        "end_date": end_date,
                         "value": value,
                         "unit_of_measure": attrs.get("UNIT"),
+                        "source": attrs.get("DATA_SOURCE"),
                     }
                 )
 
@@ -329,7 +355,7 @@ class Pipeline:
         self,
         countries: list | None = None,
         dataflows: list | None = None,
-        chunk_size: int = 15,
+        chunk_size: int = 20,
         max_countries: int | None = None,
     ):
         """
@@ -372,6 +398,11 @@ class Pipeline:
                 for df in self.get_dataflows()
                 if df.get("id", "") in self.TOP_LEVEL_DATAFLOWS
             ]
+
+        if self._latest_year is None:
+            self._latest_year = (
+                self._configuration.get("latest_year") or self.get_latest_year()
+            )
 
         # Build indicators map once
         indicators_by_dataflow = {}
@@ -432,11 +463,9 @@ class Pipeline:
             }
 
     def generate_dataset(self, economy_code: str, rows: list) -> Dataset | None:
-        end_year = self._configuration.get("end_year", 2025)
-        start_year = end_year - 1
-        economy_name = Country.get_country_name_from_iso3(economy_code)
+        economy_name = rows[0]["economy_name"] if rows else economy_code
         dataset_title = f"{economy_name} - Key Indicators"
-        dataset_name = slugify(dataset_title)
+        dataset_name = f"{economy_code.lower()}-key-indicators"
 
         dataset = Dataset(
             {
@@ -445,15 +474,30 @@ class Pipeline:
             }
         )
 
-        dataset.add_country_location(economy_code)
+        try:
+            dataset.add_country_location(economy_code)
+        except Exception:
+            logger.warning(
+                f"Cannot find country location for {economy_code}, skipping dataset"
+            )
+            return None
         dataset.add_tags(self._configuration["tags"])
-        dataset.set_time_period_year_range(start_year, end_year)
 
-        # Add resources here
-        resource_name = f"{economy_code.lower()}-key-indicators.csv"
+        year_values = [int(r["year"]) for r in rows if r.get("year")]
+        if not year_values:
+            logger.warning(f"No year data found for {economy_code}, skipping dataset")
+            return None
+        min_year, max_year = min(year_values), max(year_values)
+        dataset.set_time_period_year_range(min_year, max_year)
+        year_str = str(min_year) if min_year == max_year else f"{min_year}-{max_year}"
+
+        resource_name = f"{economy_code.lower()}_adb_key_indicators.csv"
         resource_data = {
             "name": resource_name,
-            "description": f"Key indicators for {economy_name}",
+            "description": (
+                f"Key indicators for {economy_name} compiled from the ADB Key Indicators "
+                f"Database (KIDB) for {year_str}."
+            ),
         }
 
         dataset.generate_resource(
