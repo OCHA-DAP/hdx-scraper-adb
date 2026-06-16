@@ -18,6 +18,42 @@ logger = logging.getLogger(__name__)
 
 
 class Pipeline:
+    # Maps ADB-proprietary economy codes to ISO 3166-1 alpha-3.
+    # ADB has used its own mnemonic codes since the 1970s; these 25 entries
+    # differ from ISO3 and would otherwise be silently excluded by the
+    # Country.get_country_name_from_iso3 filter in get_countries().
+    # ISO3 codes whose ADB economy name differs from the M49 standard name,
+    # excluded until name alignment is resolved.
+    EXCLUDED_ISO3 = {"CHN", "FSM", "HKG", "KGZ", "KOR", "TWN"}
+
+    ADB_TO_ISO3 = {
+        "BAN": "BGD",  # Bangladesh
+        "BHU": "BTN",  # Bhutan
+        "BRU": "BRN",  # Brunei Darussalam
+        "CAM": "KHM",  # Cambodia
+        "COO": "COK",  # Cook Islands
+        "FIJ": "FJI",  # Fiji
+        "INO": "IDN",  # Indonesia
+        "MAL": "MYS",  # Malaysia
+        "MLD": "MDV",  # Maldives
+        "MON": "MNG",  # Mongolia
+        "MYA": "MMR",  # Myanmar
+        "NAU": "NRU",  # Nauru
+        "NEP": "NPL",  # Nepal
+        "PHI": "PHL",  # Philippines
+        "PRC": "CHN",  # China
+        "RMI": "MHL",  # Marshall Islands
+        "SAM": "WSM",  # Samoa
+        "SIN": "SGP",  # Singapore
+        "SOL": "SLB",  # Solomon Islands
+        "SRI": "LKA",  # Sri Lanka
+        "TAJ": "TJK",  # Tajikistan
+        "TAP": "TWN",  # Taipei,China
+        "TIM": "TLS",  # Timor-Leste
+        "VAN": "VUT",  # Vanuatu
+        "VIE": "VNM",  # Viet Nam
+    }
+
     def __init__(self, configuration: Configuration, retriever: Retrieve, tempdir: str):
         self._configuration = configuration
         self._retriever = retriever
@@ -34,10 +70,15 @@ class Pipeline:
 
         countries = []
         for code in economy_codelist["codes"]:
-            id = code["id"]
+            adb_id = code["id"]
             name = code["name"]
-            if name and Country.get_country_name_from_iso3(id):
-                countries.append({"id": id, "name": name})
+            iso3 = self.ADB_TO_ISO3.get(adb_id, adb_id)
+            if (
+                name
+                and iso3 not in self.EXCLUDED_ISO3
+                and Country.get_country_name_from_iso3(iso3)
+            ):
+                countries.append({"id": iso3, "adb_id": adb_id, "name": name})
         return sorted(countries, key=lambda c: c["name"])
 
     def get_dataflows(self) -> list:
@@ -106,7 +147,11 @@ class Pipeline:
             yield lst[i : i + n]
 
     def get_sdmx_data_for_country_dataflow(
-        self, dataflow_id: str, indicator_chunk: list, country_code: str
+        self,
+        dataflow_id: str,
+        indicator_chunk: list,
+        country_code: str,
+        adb_code: str | None = None,
     ) -> dict | None:
         """
         Query API for a chunk of indicators for a specific country and
@@ -115,7 +160,9 @@ class Pipeline:
         Args:
             dataflow_id: ID of the dataflow
             indicator_chunk: list of indicator codes
-            country_code: ISO country code
+            country_code: ISO3 country code (used for cache filename)
+            adb_code: ADB-proprietary economy code for the API query URL;
+                      defaults to country_code when the two are identical
 
         Returns:
             sdmx-json formatted dict if successful, None if request fails
@@ -124,7 +171,7 @@ class Pipeline:
         agency_id = self._configuration.get("agency_id", "ADB")
 
         indicators_part = "+".join(indicator_chunk)
-        key = f"A.{indicators_part}.{country_code}"
+        key = f"A.{indicators_part}.{adb_code or country_code}"
         url = f"{base_url}/data/{agency_id},{dataflow_id}/{key}?format=sdmx-json&startPeriod={self._latest_year}"
 
         # Create unique filename from indicator code and length of chunk
@@ -415,6 +462,7 @@ class Pipeline:
         total_countries = len(countries)
         for i, country in enumerate(countries):
             economy_code = country["id"]
+            economy_adb_code = country.get("adb_id", economy_code)
             economy_name = country["name"]
             country_start = time.time()
 
@@ -437,6 +485,7 @@ class Pipeline:
                             dataflow_id=dataflow_id,
                             indicator_chunk=ind_chunk,
                             country_code=economy_code,
+                            adb_code=economy_adb_code,
                         )
                     except DownloadError as e:
                         logger.warning(

@@ -38,7 +38,7 @@ hdx-python-country==4.1.1
     # via
     #   hdx-scraper-adb (pyproject.toml)
     #   hdx-python-api
-hdx-python-utilities==4.0.8
+hdx-python-utilities==4.1.2
     # via
     #   hdx-scraper-adb (pyproject.toml)
     #   hdx-python-api
@@ -167,7 +167,7 @@ validators==0.35.0
     # via frictionless
 xlrd==2.0.2
     # via hdx-python-utilities
-xlsx2csv==0.8.6
+xlsx2csv==0.8.4
     # via hdx-python-utilities
 xlsxwriter==3.2.9
     # via tableschema-to-template

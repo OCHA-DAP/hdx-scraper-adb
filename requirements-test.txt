@@ -70,7 +70,7 @@ hdx-python-country==4.1.1
     #   -c requirements.txt
     #   hdx-scraper-adb (pyproject.toml)
     #   hdx-python-api
-hdx-python-utilities==4.0.8
+hdx-python-utilities==4.1.2
     # via
     #   -c requirements.txt
     #   hdx-scraper-adb (pyproject.toml)
@@ -171,7 +171,7 @@ pyphonetics==0.5.3
     # via
     #   -c requirements.txt
     #   hdx-python-utilities
-pytest==9.0.3
+pytest==9.1.0
     # via
     #   hdx-scraper-adb (pyproject.toml)
     #   pytest-cov
@@ -303,7 +303,7 @@ xlrd==2.0.2
     # via
     #   -c requirements.txt
     #   hdx-python-utilities
-xlsx2csv==0.8.6
+xlsx2csv==0.8.4
     # via
     #   -c requirements.txt
     #   hdx-python-utilities

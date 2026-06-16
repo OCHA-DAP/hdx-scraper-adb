@@ -59,7 +59,7 @@ def main(
             )
             pipeline = Pipeline(configuration, retriever, tempdir)
 
-            for output in pipeline.get_indicators_per_country(max_countries=5):
+            for output in pipeline.get_indicators_per_country():
                 dataset = pipeline.generate_dataset(
                     economy_code=output["economy_code"],
                     rows=output["data"],
