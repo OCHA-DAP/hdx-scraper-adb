@@ -65,13 +65,15 @@ class TestPipeline:
                     "caveats": "[Terms of use](https://kidb.adb.org/terms)\n",
                     "data_update_frequency": 365,
                     "dataset_date": "[2024-01-01T00:00:00 TO 2024-12-31T23:59:59]",
-                    "dataset_source": "National and international agencies via ADB Key Indicators Database",
+                    "dataset_source": "Asian Development Bank: Key Indicators Database Online "
+                    "(https://kidb.adb.org)",
                     "groups": [{"name": "afg"}],
                     "license_id": "cc-by",
                     "maintainer": "b682f6f7-cd7e-4bd4-8aa7-f74138dc6313",
                     "methodology": "[FAQ](https://kidb.adb.org/faq)\n",
                     "name": "afg-key-indicators",
-                    "notes": "This dataset contains key indicators for Afghanistan compiled from the ADB Key Indicators Database (KIDB).",
+                    "notes": "This dataset contains key indicators for Afghanistan compiled from "
+                    "the [ADB Key Indicators Database](https://kidb.adb.org) (KIDB).",
                     "owner_org": "c64c8840-933b-4378-91a4-d5063da28879",
                     "package_creator": "HDX Data Systems Team",
                     "private": False,
