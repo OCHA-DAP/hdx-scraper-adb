@@ -59,7 +59,7 @@ def main(
             )
             pipeline = Pipeline(configuration, retriever, tempdir)
 
-            for output in pipeline.get_indicators_per_country():
+            for output in pipeline.get_indicators_per_country(max_countries=1):
                 dataset = pipeline.generate_dataset(
                     economy_code=output["economy_code"],
                     rows=output["data"],
@@ -85,7 +85,7 @@ def main(
 if __name__ == "__main__":
     facade(
         main,
-        hdx_site="demo",
+        # hdx_site="demo",
         user_agent_config_yaml=join(expanduser("~"), ".useragents.yaml"),
         user_agent_lookup=_LOOKUP,
         project_config_yaml=script_dir_plus_file(
